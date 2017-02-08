@@ -25,10 +25,13 @@ extern NSString * const kGMFPlayerDidMinimizeNotification;
 extern NSString * const kGMFPlayerPlaybackStateDidChangeNotification;
 extern NSString * const kGMFPlayerStateDidChangeToFinishedNotification;
 extern NSString * const kGMFPlayerStateWillChangeToFinishedNotification;
-
+extern NSString * const kGMFPlayerWillEnterFullscreen;
+extern NSString * const kGMFPlayerWillExitFullscreen;
 extern NSString * const kGMFPlayerPlaybackDidFinishReasonUserInfoKey;
 extern NSString * const kGMFPlayerPlaybackWillFinishReasonUserInfoKey;
-
+extern NSString * const kGMFPlayerControlsWillHideNotification;
+extern NSString * const kGMFPlayerControlsDidHideNotification;
+extern NSString * const kGMFPlayerControlsDidShowNotification;
 
 @interface GMFPlayerViewController : UIViewController<GMFVideoPlayerDelegate,
                                                       GMFPlayerOverlayViewControllerDelegate,
@@ -54,6 +57,10 @@ extern NSString * const kGMFPlayerPlaybackWillFinishReasonUserInfoKey;
 // Default: No logo.
 @property(nonatomic, strong) UIImage *logoImage;
 
+@property(nonatomic) BOOL isFullscreen;
+
+@property(nonatomic) BOOL shouldHideControls;
+
 - (id)init;
 
 - (void)loadStreamWithURL:(NSURL *)URL;
@@ -63,6 +70,12 @@ extern NSString * const kGMFPlayerPlaybackWillFinishReasonUserInfoKey;
 - (void)play;
 
 - (void)pause;
+
+- (void)stop;
+
+- (void)setFullscreen:(BOOL)isFullscreen;
+
+- (void)setFullscreenVisible:(BOOL)isFullscreenVisible;
 
 - (GMFPlayerState)playbackState;
 

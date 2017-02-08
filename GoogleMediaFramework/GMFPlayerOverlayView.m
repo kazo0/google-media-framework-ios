@@ -45,7 +45,7 @@
     _playImage = [GMFResources playerBarPlayLargeButtonImage];
     _pauseImage = [GMFResources playerBarPauseLargeButtonImage];
     _replayImage = [GMFResources playerBarReplayLargeButtonImage];
-    
+
     // Set the button label strings (for accessibility).
     _playLabel = NSLocalizedStringFromTable(@"Play",
                                             @"GoogleMediaFramework",
@@ -199,7 +199,7 @@
   [_topBarView setAlpha:(_isTopBarEnabled && visible) ? 1 : 0];
   [_playerControlsView setAlpha:visible ? 1 : 0];
   [_playPauseReplayButton setAlpha:visible ? 1 : 0];
-  
+
   [self setNeedsLayout];
   [self layoutIfNeeded];
 }
@@ -231,6 +231,10 @@
 
 - (void)setLogoImage:(UIImage *)logoImage {
   [_topBarView setLogoImage:logoImage];
+}
+
+-(void)setFullscreenVisible:(BOOL)isFullscreenVisible {
+    [_playerControlsView setFullscreenVisible:isFullscreenVisible];
 }
 
 - (void)showPlayButton {
@@ -291,8 +295,8 @@
   _playImage = [_playImage GMF_createTintedImage:color];
   _pauseImage = [_pauseImage GMF_createTintedImage:color];
   _replayImage = [_replayImage GMF_createTintedImage:color];
-  
-  // Tint the play/pause/replay button and the controls view.
+    
+    // Tint the play/pause/replay button and the controls view.
   [_playPauseReplayButton GMF_applyTintColor:color];
   [_playerControlsView applyControlTintColor:color];
 }

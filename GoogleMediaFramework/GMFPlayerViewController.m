@@ -31,11 +31,20 @@ NSString * const kGMFPlayerStateDidChangeToFinishedNotification =
     @"kGMFPlayerStateDidChangeToFinishedNotification";
 NSString * const kGMFPlayerStateWillChangeToFinishedNotification =
     @"kGMFPlayerStateWillChangeToFinishedNotification";
-
+NSString * const kGMFPlayerWillEnterFullscreen =
+    @"kGMFPlayerWillEnterFullsceen";
+NSString * const kGMFPlayerWillExitFullscreen =
+    @"kGMFPlayerWillExitFullscreen";
 NSString * const kGMFPlayerPlaybackDidFinishReasonUserInfoKey =
     @"kGMFPlayerPlaybackDidFinishReasonUserInfoKey";
 NSString * const kGMFPlayerPlaybackWillFinishReasonUserInfoKey =
     @"kGMFPlayerPlaybackWillFinishReasonUserInfoKey";
+NSString * const kGMFPlayerControlsWillHideNotification =
+    @"kGMFPlayerControlsWillHideNotification";
+NSString * const kGMFPlayerControlsDidHideNotification =
+    @"kGMFPlayerControlsDidHideNotification";
+NSString * const kGMFPlayerControlsDidShowNotification =
+    @"kGMFPlayerControlsDidShowNotification";
 
 // If there is no overlay view created yet, but we receive a request to create action button,
 // we store the request in a mutable array of dictionaries which we use to construct the the
@@ -55,10 +64,11 @@ NSString *const kActionButtonSelectorKey = @"kActionButtonSelectorKey";
 @implementation GMFPlayerViewController {
   GMFPlayerView *_playerView;
   NSURL *_currentMediaURL;
-
+  BOOL _isFullscreen;
   BOOL _isUserScrubbing;
   BOOL _wasPlayingBeforeSeeking;
-  
+  BOOL _shouldHideControls;
+  CGRect _originalPlayerFrame;
   // If there is no overlay view created yet, but we receive a request to create action button,
   // we store the request in a mutable array of dictionaries which we use to construct the the
   // action buttons when the overlay view is created.
@@ -87,6 +97,13 @@ NSString *const kActionButtonSelectorKey = @"kActionButtonSelectorKey";
   }
 }
 
+- (void)setShouldHideControls:(BOOL)shouldHideControls {
+    _shouldHideControls = shouldHideControls;
+    if (_videoPlayerOverlayViewController) {
+        [_videoPlayerOverlayViewController playerOverlayView].hidden = _shouldHideControls;
+    }
+}
+
 - (void)loadStreamWithURL:(NSURL *)URL {
   [_player loadStreamWithURL:URL];
 }
@@ -109,6 +126,10 @@ NSString *const kActionButtonSelectorKey = @"kActionButtonSelectorKey";
 
 - (void)pause {
   [_player pause];
+}
+
+- (void)stop {
+    [self resetPlayerAndPlayerView];
 }
 
 - (void)setAboveRenderingView:(UIView *)view {
@@ -169,9 +190,32 @@ NSString *const kActionButtonSelectorKey = @"kActionButtonSelectorKey";
     }
 }
 
+- (void)playerControlsWillHide {
+    [[NSNotificationCenter defaultCenter]
+     postNotificationName:kGMFPlayerControlsWillHideNotification
+     object:self
+     userInfo:nil];
+}
+
+- (void)playerControlsDidHide {
+    [[NSNotificationCenter defaultCenter]
+     postNotificationName:kGMFPlayerControlsDidHideNotification
+     object:self
+     userInfo:nil];
+}
+
+- (void)playerControlsDidShow {
+    [[NSNotificationCenter defaultCenter]
+     postNotificationName:kGMFPlayerControlsDidShowNotification
+     object:self
+     userInfo:nil];
+}
+
 - (void)loadView {
-  _playerView = [[GMFPlayerView alloc] init];
-  [self setView:_playerView];
+   _playerView = [[GMFPlayerView alloc] init];
+    _playerView.autoresizesSubviews = YES;
+    _playerView.autoresizingMask = UIViewAutoresizingFlexibleHeight | UIViewAutoresizingFlexibleWidth;
+    [self setView:_playerView];
 }
 
 - (void)viewDidLoad {
@@ -190,6 +234,7 @@ NSString *const kActionButtonSelectorKey = @"kActionButtonSelectorKey";
   }
   
   [_playerView setOverlayView:[_videoPlayerOverlayViewController playerOverlayView]];
+  [_videoPlayerOverlayViewController playerOverlayView].hidden = _shouldHideControls;
   if (_controlTintColor && [self.playerOverlayView respondsToSelector:@selector(applyControlTintColor:)]) {
     [self.playerOverlayView applyControlTintColor:_controlTintColor];
   }
@@ -212,6 +257,14 @@ NSString *const kActionButtonSelectorKey = @"kActionButtonSelectorKey";
     }
   [self setDefaultVideoPlayerOverlayDelegate];
 }
+
+- (BOOL)shouldAutorotate {
+    if (self.isFullscreen) {
+        return NO;
+    }
+    return YES;
+}
+
 
 - (void)didTapGestureCapturingView:(UITapGestureRecognizer *)recognizer {
   [_videoPlayerOverlayViewController togglePlayerControlsVisibility];
@@ -259,6 +312,18 @@ NSString *const kActionButtonSelectorKey = @"kActionButtonSelectorKey";
   if (self.playerOverlayView && [self.playerOverlayView respondsToSelector:@selector(setLogoImage:)]) {
     [self.playerOverlayView setLogoImage:logoImage];
   }
+}
+
+- (void) setFullscreen:(BOOL)isFullscreen {
+    if (_isFullscreen != isFullscreen) {
+        [self toggleFullscreen];
+    }
+}
+
+-(void) setFullscreenVisible:(BOOL)isFullscreenVisible {
+    if (self.playerOverlayView && [self.playerOverlayView respondsToSelector:@selector(setFullscreenVisible:)]) {
+        [self.playerOverlayView setFullscreenVisible:isFullscreenVisible];
+    }
 }
 
 #pragma mark Player State Change Handlers
@@ -400,6 +465,10 @@ NSString *const kActionButtonSelectorKey = @"kActionButtonSelectorKey";
   }
 }
 
+- (void)didPressFullscreen:(BOOL)isFullscreen {
+    [self toggleFullscreen];
+}
+
 - (void)didPressMinimize {
   // Notify first to give observers a chance to remove themselves.
   [self notifyUserWillMinimize];
@@ -452,10 +521,52 @@ NSString *const kActionButtonSelectorKey = @"kActionButtonSelectorKey";
 
 // Reset these together, else playerView might retain a reference to the player's renderingView.
 - (void)resetPlayerAndPlayerView {
+    [self pause];
+    
   [_videoPlayerOverlayViewController reset];
   [_playerView reset];
   [_player reset];
 }
+
+- (void)toggleFullscreen {
+    if (!_isFullscreen) {
+        [self enterFullscreen];
+    } else {
+        [self exitFullscreen];
+    }
+}
+
+- (void)enterFullscreen {
+    
+    if (_isFullscreen) {
+        return;
+    }
+    
+    [[NSNotificationCenter defaultCenter]
+     postNotificationName:kGMFPlayerWillEnterFullscreen
+     object:self
+     userInfo:nil];
+    
+    _isFullscreen = YES;
+}
+
+- (void)exitFullscreen {
+    
+    if (!_isFullscreen) {
+        return;
+    }
+        [[NSNotificationCenter defaultCenter]
+         postNotificationName:kGMFPlayerWillExitFullscreen
+         object:self
+         userInfo:nil];
+    
+        _isFullscreen = NO;
+}
+
+-(BOOL)prefersStatusBarHidden{
+    return _isFullscreen;
+}
+
 
 // View was removed, clear player and notify observers.
 - (void)dealloc {
