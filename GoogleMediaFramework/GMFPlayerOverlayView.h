@@ -39,7 +39,6 @@ typedef enum CurrentPlayPauseReplayIcon {
 // Show/hide the loading spinner
 - (void)showSpinner;
 - (void)hideSpinner;
-
 - (void)setPlayerBarVisible:(BOOL)visible;
 
 - (void)setSeekbarTrackColor:(UIColor *)color;
@@ -53,6 +52,7 @@ typedef enum CurrentPlayPauseReplayIcon {
 - (void)applyControlTintColor:(UIColor *)color;
 - (void)setVideoTitle:(NSString *)videoTitle;
 - (void)setLogoImage:(UIImage *)logoImage;
+- (void)setFullscreenVisible:(BOOL)isFullscreenVisible;
 
 - (void)disableTopBar;
 - (void)enableTopBar;
